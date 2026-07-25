@@ -36,6 +36,9 @@ describe("AgentService", () => {
         turn += 1;
         if (turn === 1) {
           expect(tools).toHaveLength(1);
+          expect(messages[0]?.content).toContain(
+            "prefer an unambiguous human account over app, bot, or service accounts",
+          );
           return {
             role: "assistant",
             content: null,
@@ -74,7 +77,7 @@ describe("AgentService", () => {
     }]);
   });
 
-  it("requires Jira grounding for a broad tasks question", async () => {
+  it("requires configured grounding for a broad non-English task question", async () => {
     const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
     const mcp: McpClient = {
       async listTools() {
@@ -128,14 +131,14 @@ describe("AgentService", () => {
       },
     };
     const config = testConfig();
-    config.mcp.toolTriggerTerms = ["tasks", "issues"];
+    config.mcp.toolTriggerTerms = ["tasks", "issues", "משימה"];
     config.mcp.defaultToolArgs = {
       cloudId: "https://example.atlassian.net",
     };
     const service = new AgentService(model, config, pino({ level: "silent" }));
 
     const result = await service.run({
-      instruction: "Can you explain a little bit about our tasks?",
+      instruction: "אתה יכול להוסיף לי משימה חדשה?",
       context: {
         username: "guy",
         roomName: "bar",
@@ -153,5 +156,121 @@ describe("AgentService", () => {
         cloudId: "https://example.atlassian.net",
       },
     }]);
+  });
+
+  it("uses configured tool arguments only as fallbacks", async () => {
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const mcp: McpClient = {
+      async listTools() {
+        return [{
+          name: "createJiraIssue",
+          description: "Create a Jira issue",
+          inputSchema: {
+            type: "object",
+            properties: {
+              cloudId: { type: "string" },
+              projectKey: { type: "string" },
+              summary: { type: "string" },
+            },
+            required: ["cloudId", "projectKey", "summary"],
+          },
+        }];
+      },
+      async callTool(name, args) {
+        calls.push({ name, args });
+        return { key: "OPS-42" };
+      },
+      async close() {},
+    };
+    let turn = 0;
+    const model: ModelClient = {
+      async complete(_messages, tools) {
+        turn += 1;
+        if (turn === 1) {
+          expect(tools![0]?.function.parameters.required).toEqual(["summary"]);
+          return {
+            role: "assistant",
+            content: null,
+            tool_calls: [{
+              id: "jira-create",
+              type: "function",
+              function: {
+                name: tools![0]!.function.name,
+                arguments: JSON.stringify({
+                  projectKey: "OPS",
+                  summary: "Repair printer",
+                }),
+              },
+            }],
+          };
+        }
+        return { role: "assistant", content: "Created **OPS-42**." };
+      },
+    };
+    const config = testConfig();
+    config.mcp.defaultToolArgs = {
+      cloudId: "https://example.atlassian.net",
+      projectKey: "DEV",
+    };
+    const service = new AgentService(model, config, pino({ level: "silent" }));
+
+    await service.run({
+      instruction: "Create Repair printer in OPS",
+      context: {
+        username: "guy",
+        roomName: "bar",
+        roomId: "R1",
+        messageId: "MSG",
+      },
+      mcp,
+    });
+
+    expect(calls).toEqual([{
+      name: "createJiraIssue",
+      args: {
+        cloudId: "https://example.atlassian.net",
+        projectKey: "OPS",
+        summary: "Repair printer",
+      },
+    }]);
+  });
+
+  it("retains bounded conversation context within a room", async () => {
+    const mcp: McpClient = {
+      async listTools() { return []; },
+      async callTool() { return {}; },
+      async close() {},
+    };
+    let turn = 0;
+    const model: ModelClient = {
+      async complete(messages) {
+        turn += 1;
+        if (turn === 1) {
+          expect(messages).toHaveLength(2);
+          return { role: "assistant", content: "The project is **OPS**." };
+        }
+        expect(messages).toHaveLength(4);
+        expect(messages[1]?.content).toContain("Which project?");
+        expect(messages[2]?.content).toBe("The project is **OPS**.");
+        expect(messages[3]?.content).toContain("Add the task there");
+        return { role: "assistant", content: "I understand that “there” means OPS." };
+      },
+    };
+    const service = new AgentService(model, testConfig(), pino({ level: "silent" }));
+    const context = {
+      username: "guy",
+      roomName: "bar",
+      roomId: "R1",
+      messageId: "MSG1",
+    };
+
+    await service.run({ instruction: "Which project?", context, mcp });
+    const result = await service.run({
+      instruction: "Add the task there",
+      context: { ...context, messageId: "MSG2" },
+      mcp,
+    });
+
+    expect(result).toBe("I understand that “there” means OPS.");
   });
 });

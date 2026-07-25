@@ -63,6 +63,8 @@ const envSchema = z.object({
   MCP_TOOL_TRIGGER_TERMS: z.string().default(""),
   MAX_TOOL_ITERATIONS: positiveInteger(6),
   MAX_TOOL_RESULT_CHARS: positiveInteger(12_000),
+  CONVERSATION_HISTORY_TURNS: nonnegativeInteger(6),
+  CONVERSATION_HISTORY_TTL_MS: positiveInteger(1_800_000),
   SYSTEM_PROMPT: z.string().default(""),
 });
 
@@ -117,6 +119,10 @@ export interface AppConfig {
     toolTriggerTerms: string[];
     maxToolIterations: number;
     maxToolResultChars: number;
+  };
+  conversation: {
+    historyTurns: number;
+    historyTtlMs: number;
   };
   systemPrompt: string;
 }
@@ -196,6 +202,10 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
       toolTriggerTerms: csvList(env.MCP_TOOL_TRIGGER_TERMS),
       maxToolIterations: env.MAX_TOOL_ITERATIONS,
       maxToolResultChars: env.MAX_TOOL_RESULT_CHARS,
+    },
+    conversation: {
+      historyTurns: env.CONVERSATION_HISTORY_TURNS,
+      historyTtlMs: env.CONVERSATION_HISTORY_TTL_MS,
     },
     systemPrompt: env.SYSTEM_PROMPT,
   };

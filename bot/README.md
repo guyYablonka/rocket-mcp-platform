@@ -160,9 +160,15 @@ Static MCP credentials remain available for non-user-specific development:
 ```dotenv
 MCP_AUTH_MODE=static
 MCP_BEARER_TOKEN=replace-with-static-token
-# Optional defaults injected into matching tool parameters.
-MCP_DEFAULT_TOOL_ARGS_JSON={"cloudId":"https://company.atlassian.net"}
+# Optional fallbacks injected into matching tool parameters.
+MCP_DEFAULT_TOOL_ARGS_JSON={"cloudId":"00000000-0000-0000-0000-000000000000","issueTypeName":"Task"}
 ```
+
+For Atlassian, `cloudId` is the site's UUID returned by
+`getAccessibleAtlassianResources`, not the site's browser URL.
+
+Do not configure `projectKey` or `projectIdOrKey` unless every new issue should
+go to that one project. Explicit tool arguments override configured fallbacks.
 
 ### Tool policy
 
@@ -176,6 +182,17 @@ MCP_TOOL_TRIGGER_TERMS=tasks,issues,tickets
 
 Only allowed tools are shown to the model. Application authorization is still enforced by the MCP gateway and application API.
 Trigger terms are deployment-specific. When a request contains one, the first model turn must call an available tool. This keeps the core bot application-neutral while allowing reliable grounding for each connected application.
+
+### Conversation context
+
+The bot keeps a bounded, in-memory history per Rocket.Chat room so follow-up requests can refer to tasks, projects, and prior answers. History expires automatically and is lost when the bot restarts.
+
+```dotenv
+CONVERSATION_HISTORY_TURNS=6
+CONVERSATION_HISTORY_TTL_MS=1800000
+```
+
+Set `CONVERSATION_HISTORY_TURNS=0` to disable conversation memory.
 
 ## Request lifecycle
 

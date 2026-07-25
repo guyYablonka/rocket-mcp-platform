@@ -27,6 +27,7 @@ describe("loadConfig", () => {
       MCP_DEFAULT_TOOL_ARGS_JSON: JSON.stringify({
         cloudId: "https://example.atlassian.net",
       }),
+      CONVERSATION_HISTORY_TURNS: "4",
     });
     expect(config.model.baseUrl).toBe("https://api.moonshot.ai/v1");
     expect(config.rocketChat.allowedRoomIds).toEqual(new Set(["R1", "R2"]));
@@ -35,6 +36,7 @@ describe("loadConfig", () => {
     expect(config.mcp.defaultToolArgs).toEqual({
       cloudId: "https://example.atlassian.net",
     });
+    expect(config.conversation.historyTurns).toBe(4);
   });
 
   it("allows webhook token verification to be disabled", () => {

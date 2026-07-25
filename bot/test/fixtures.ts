@@ -53,6 +53,10 @@ export function testConfig(): AppConfig {
       maxToolIterations: 3,
       maxToolResultChars: 2_000,
     },
+    conversation: {
+      historyTurns: 6,
+      historyTtlMs: 1_800_000,
+    },
     systemPrompt: "",
   };
 }
