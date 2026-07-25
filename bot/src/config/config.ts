@@ -28,7 +28,11 @@ const envSchema = z.object({
   WEBHOOK_RATE_LIMIT_MAX: positiveInteger(60),
 
   ROCKETCHAT_URL: z.string().trim().url(),
-  ROCKETCHAT_WEBHOOK_TOKEN: z.string().min(1),
+  ROCKETCHAT_TRANSPORT: z.enum(["ddp", "webhook"]).default("ddp"),
+  ROCKETCHAT_DDP_ROOM_IDS: z.string().default(""),
+  ROCKETCHAT_DDP_CONNECT_TIMEOUT_MS: positiveInteger(15_000),
+  ROCKETCHAT_DDP_RECONNECT_MS: positiveInteger(5_000),
+  ROCKETCHAT_WEBHOOK_TOKEN: z.string().trim().default(""),
   ROCKETCHAT_BOT_USERNAME: z.string().trim().min(1),
   ROCKETCHAT_USER_ID: z.string().trim().min(1),
   ROCKETCHAT_AUTH_TOKEN: z.string().min(1),
@@ -52,10 +56,11 @@ const envSchema = z.object({
   GATEWAY_ACTOR_AUDIENCE: z.string().trim().default(""),
   GATEWAY_ACTOR_TTL_SECONDS: positiveInteger(120).pipe(z.number().max(3_600)),
   MCP_HEADERS_JSON: z.string().default("{}"),
-  MCP_PROTOCOL_VERSION: z.string().trim().default("2025-11-25"),
+  MCP_DEFAULT_TOOL_ARGS_JSON: z.string().default("{}"),
   MCP_TIMEOUT_MS: positiveInteger(120_000),
   MCP_TOOL_POLICY: z.enum(["allow-list", "allow-all", "deny-all"]).default("allow-list"),
   MCP_TOOL_ALLOWLIST: z.string().default(""),
+  MCP_TOOL_TRIGGER_TERMS: z.string().default(""),
   MAX_TOOL_ITERATIONS: positiveInteger(6),
   MAX_TOOL_RESULT_CHARS: positiveInteger(12_000),
   SYSTEM_PROMPT: z.string().default(""),
@@ -75,6 +80,10 @@ export interface AppConfig {
   };
   rocketChat: {
     url: string;
+    transport: "ddp" | "webhook";
+    ddpRoomIds: string[];
+    ddpConnectTimeoutMs: number;
+    ddpReconnectMs: number;
     webhookToken: string;
     botUsername: string;
     userId: string;
@@ -101,10 +110,11 @@ export interface AppConfig {
     actorAudience: string;
     actorTtlSeconds: number;
     headers: Record<string, string>;
-    protocolVersion: string;
+    defaultToolArgs: Record<string, unknown>;
     timeoutMs: number;
     toolPolicy: "allow-list" | "allow-all" | "deny-all";
     toolAllowlist: string[];
+    toolTriggerTerms: string[];
     maxToolIterations: number;
     maxToolResultChars: number;
   };
@@ -130,6 +140,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
   if (env.MCP_AUTH_MODE === "static" && !env.MCP_BEARER_TOKEN) {
     throw new Error("Invalid configuration: MCP_BEARER_TOKEN is required when MCP_AUTH_MODE=static");
   }
+  const ddpRoomIds = csvList(env.ROCKETCHAT_DDP_ROOM_IDS);
 
   return {
     environment: env.NODE_ENV,
@@ -145,6 +156,10 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     },
     rocketChat: {
       url: trimTrailingSlash(env.ROCKETCHAT_URL),
+      transport: env.ROCKETCHAT_TRANSPORT,
+      ddpRoomIds,
+      ddpConnectTimeoutMs: env.ROCKETCHAT_DDP_CONNECT_TIMEOUT_MS,
+      ddpReconnectMs: env.ROCKETCHAT_DDP_RECONNECT_MS,
       webhookToken: env.ROCKETCHAT_WEBHOOK_TOKEN,
       botUsername: env.ROCKETCHAT_BOT_USERNAME.replace(/^@/, ""),
       userId: env.ROCKETCHAT_USER_ID,
@@ -171,10 +186,14 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
       actorAudience: env.GATEWAY_ACTOR_AUDIENCE || env.MCP_URL,
       actorTtlSeconds: env.GATEWAY_ACTOR_TTL_SECONDS,
       headers: parseHeaders(env.MCP_HEADERS_JSON),
-      protocolVersion: env.MCP_PROTOCOL_VERSION,
+      defaultToolArgs: parseJsonObject(
+        env.MCP_DEFAULT_TOOL_ARGS_JSON,
+        "MCP_DEFAULT_TOOL_ARGS_JSON",
+      ),
       timeoutMs: env.MCP_TIMEOUT_MS,
       toolPolicy: env.MCP_TOOL_POLICY,
       toolAllowlist: csvList(env.MCP_TOOL_ALLOWLIST),
+      toolTriggerTerms: csvList(env.MCP_TOOL_TRIGGER_TERMS),
       maxToolIterations: env.MAX_TOOL_ITERATIONS,
       maxToolResultChars: env.MAX_TOOL_RESULT_CHARS,
     },
@@ -183,15 +202,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
 }
 
 function parseHeaders(value: string): Record<string, string> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch (error) {
-    throw new Error(`Invalid configuration: MCP_HEADERS_JSON must be valid JSON: ${errorMessage(error)}`);
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Invalid configuration: MCP_HEADERS_JSON must be a JSON object");
-  }
+  const parsed = parseJsonObject(value, "MCP_HEADERS_JSON");
   const protectedHeaders = new Set(["authorization", "content-type", "accept", "mcp-session-id", "mcp-protocol-version"]);
   const headers: Record<string, string> = {};
   for (const [name, item] of Object.entries(parsed)) {
@@ -201,6 +212,19 @@ function parseHeaders(value: string): Record<string, string> {
     headers[name] = String(item);
   }
   return headers;
+}
+
+function parseJsonObject(value: string, name: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch (error) {
+    throw new Error(`Invalid configuration: ${name} must be valid JSON: ${errorMessage(error)}`);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`Invalid configuration: ${name} must be a JSON object`);
+  }
+  return parsed as Record<string, unknown>;
 }
 
 function csvSet(value: string): Set<string> {

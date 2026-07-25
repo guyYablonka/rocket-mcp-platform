@@ -47,6 +47,8 @@ export interface ModelTool {
   };
 }
 
+export type ModelToolChoice = "auto" | "required";
+
 export interface ModelCompletion {
   role: "assistant";
   content: string | null;

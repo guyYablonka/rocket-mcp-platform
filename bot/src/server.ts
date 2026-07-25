@@ -7,13 +7,17 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config.logLevel);
   const container = createContainer(config, logger);
+  await container.ddpListener?.start();
   const app = createApp({ config, webhookService: container.webhookService, logger });
   const server = app.listen(config.http.port, config.http.host, () => {
     logger.info(
       {
         host: config.http.host,
         port: config.http.port,
-        path: config.http.webhookPath,
+        transport: config.rocketChat.transport,
+        ...(config.rocketChat.transport === "webhook"
+          ? { path: config.http.webhookPath }
+          : {}),
       },
       "bot listening",
     );
@@ -24,6 +28,7 @@ async function main(): Promise<void> {
     if (stopping) return;
     stopping = true;
     logger.info({ signal }, "shutting down");
+    await container.ddpListener?.stop();
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
     });

@@ -5,6 +5,7 @@ import type {
   ModelCompletion,
   ModelMessage,
   ModelTool,
+  ModelToolChoice,
 } from "../../domain/types.js";
 import { fetchWithTimeout, remoteResponseError } from "../../utils/http.js";
 
@@ -32,6 +33,7 @@ export class OpenAiCompatibleModelClient implements ModelClient {
   async complete(
     messages: ModelMessage[],
     tools: ModelTool[] = [],
+    toolChoice: ModelToolChoice = "auto",
   ): Promise<ModelCompletion> {
     const response = await fetchWithTimeout(
       `${this.config.baseUrl}/chat/completions`,
@@ -44,7 +46,7 @@ export class OpenAiCompatibleModelClient implements ModelClient {
         body: JSON.stringify({
           model: this.config.name,
           messages,
-          ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
+          ...(tools.length > 0 ? { tools, tool_choice: toolChoice } : {}),
         }),
       },
       this.config.timeoutMs,

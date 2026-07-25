@@ -28,7 +28,7 @@ export function stripMention(text: string, botUsername: string): string {
 
 export function containsMention(text: string, botUsername: string): boolean {
   const escaped = escapeRegex(botUsername);
-  return new RegExp(`(?:^|\\s)@?${escaped}(?=\\s|[:,]|$)`, "i").test(text);
+  return new RegExp(`(?:^|\\s)@${escaped}(?=\\s|[:,]|$)`, "i").test(text);
 }
 
 function field(payload: Record<string, unknown>, ...names: string[]): unknown {

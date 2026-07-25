@@ -16,7 +16,6 @@ export class McpSdkClient implements McpClient {
     const headers = {
       ...config.headers,
       ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
-      "MCP-Protocol-Version": config.protocolVersion,
     };
     const timedFetch: typeof fetch = (input, init = {}) => {
       const timeoutSignal = AbortSignal.timeout(config.timeoutMs);

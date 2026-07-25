@@ -3,7 +3,7 @@
 ```mermaid
 flowchart LR
   U["Rocket.Chat user"] -->|"@bot request"| RC["Rocket.Chat"]
-  RC -->|"Signed outgoing webhook<br/>stable Rocket user ID"| B["Bot + model orchestrator"]
+  RC -->|"Authenticated DDP stream<br/>stable Rocket user ID"| B["Bot + model orchestrator"]
   B -->|"Short-lived actor JWT<br/>audience: MCP gateway"| G["MCP gateway"]
   G -->|"Rocket user + tenant lookup"| L[("User link registry")]
   G -->|"Gateway service credential<br/>user + requested scopes"| X["Application token exchange"]
@@ -18,7 +18,8 @@ flowchart LR
 
 | Credential | Issuer and audience | Used only for |
 |---|---|---|
-| Rocket.Chat webhook token | Rocket.Chat integration → bot | Authenticating webhook delivery |
+| Rocket.Chat personal access token | Rocket.Chat → bot | Authenticating DDP subscriptions and REST replies |
+| Rocket.Chat webhook token (fallback only) | Rocket.Chat integration → bot | Authenticating webhook delivery when fallback mode is enabled |
 | Actor JWT | Bot → MCP gateway | Binding a short-lived MCP request to the Rocket user, tenant, room, and request |
 | Gateway service token | Application administrator → token-exchange endpoint | Authenticating the trusted gateway itself |
 | Application access token | Application auth server → application API | Authorizing the linked application user and scopes |

@@ -1,11 +1,15 @@
 # Rocket.Chat MCP bot
 
-A TypeScript/Express bot that accepts Rocket.Chat outgoing webhooks, lets Qwen, Kimi, or another OpenAI-compatible model select approved MCP tools, and posts the final answer back into the originating thread.
+A TypeScript bot that receives Rocket.Chat messages over DDP, lets Qwen, Kimi,
+or another OpenAI-compatible model select approved MCP tools, and posts the final
+answer back into the originating thread. It uses the DDP v1 operations available
+in both Rocket.Chat 3.11.4 and 8.4.
 
 ## Stack
 
-- Express 5 for HTTP routing and async error propagation
-- Zod 4 for environment, webhook, and model-response validation
+- `ws` for the Rocket.Chat DDP v1 connection and message subscriptions
+- Express 5 for health checks and the optional webhook fallback
+- Zod 4 for environment, message, webhook, and model-response validation
 - Official MCP TypeScript SDK v1 with Streamable HTTP
 - JOSE for short-lived actor JWTs
 - Pino and `pino-http` for structured, redacted logs
@@ -33,7 +37,9 @@ src/
 └── server.ts        process entry point and graceful shutdown
 ```
 
-`services/` is the business-logic layer. `repositories/` is the data-access layer and can later be replaced by Redis or a database without changing webhook orchestration.
+`services/` is the business-logic layer. `repositories/` is the data-access
+layer and can later be replaced by Redis or a database without changing message
+orchestration.
 
 ## Install and verify
 
@@ -60,23 +66,50 @@ Health check: `GET /healthz`
 
 ## Rocket.Chat setup
 
-Create a dedicated bot user and an **Outgoing** integration:
+Create a dedicated Rocket.Chat bot user, generate a personal access token for
+that user, and add it to every room it should monitor. No outgoing integration
+is required.
 
-| Setting | Value |
-|---|---|
-| Event Trigger | `Message Sent` |
-| Trigger Words | `@assistant-bot` |
-| URL | `https://YOUR-BOT-HOST/webhooks/rocketchat` |
-| Token | A long random webhook secret |
-| Post as | `assistant-bot` |
+Configure the bot with the stable room IDs, not room names:
 
-Set the same integration token as `ROCKETCHAT_WEBHOOK_TOKEN`. Scope the integration and bot channel membership as narrowly as possible.
+```dotenv
+ROCKETCHAT_URL=https://chat.example.com
+ROCKETCHAT_TRANSPORT=ddp
+ROCKETCHAT_DDP_ROOM_IDS=
+ROCKETCHAT_BOT_USERNAME=assistant-bot
+ROCKETCHAT_USER_ID=BOT_USER_ID
+ROCKETCHAT_AUTH_TOKEN=BOT_PERSONAL_ACCESS_TOKEN
+```
+
+The bot opens an outbound connection to
+`wss://chat.example.com/websocket`, authenticates with the personal access
+token, and subscribes to `stream-room-messages`. When
+`ROCKETCHAT_DDP_ROOM_IDS` is empty, it uses Rocket.Chat's `__my_messages__`
+stream and receives messages from every room the bot has joined. Set a
+comma-separated list of stable room IDs only to narrow that subscription. The
+bot responds to DDP ping frames, reconnects after connection loss, and restores
+the subscription. Replies continue to use the Rocket.Chat REST API.
+
+Keep the bot out of rooms it does not need. You can also set
+`ROCKETCHAT_ALLOWED_ROOM_IDS` as a defense-in-depth authorization check.
+With `ROCKETCHAT_REQUIRE_MENTION=true` (the default), the bot processes only
+messages containing an explicit `@assistant-bot` mention.
+
+### Optional webhook fallback
+
+Set `ROCKETCHAT_TRANSPORT=webhook` to use the original outgoing-integration
+endpoint instead. In that mode, configure the integration URL as
+`https://YOUR-BOT-HOST/webhooks/rocketchat` and set the same optional integration
+token in `ROCKETCHAT_WEBHOOK_TOKEN`. The webhook route is not mounted in DDP
+mode.
 
 ## Configuration
 
 Copy `.env.example` to `.env` and provide the values through your process manager or container. The service intentionally does not load `.env` automatically.
 
-If the service runs behind a trusted reverse proxy, set `TRUST_PROXY_HOPS` to the exact number of proxy hops so rate limiting uses the correct client address. Leave it at `0` when directly exposed.
+If webhook fallback mode runs behind a trusted reverse proxy, set
+`TRUST_PROXY_HOPS` to the exact number of proxy hops so rate limiting uses the
+correct client address. Leave it at `0` when directly exposed.
 
 ### Qwen
 
@@ -127,6 +160,8 @@ Static MCP credentials remain available for non-user-specific development:
 ```dotenv
 MCP_AUTH_MODE=static
 MCP_BEARER_TOKEN=replace-with-static-token
+# Optional defaults injected into matching tool parameters.
+MCP_DEFAULT_TOOL_ARGS_JSON={"cloudId":"https://company.atlassian.net"}
 ```
 
 ### Tool policy
@@ -136,19 +171,22 @@ The production default is an allow-list:
 ```dotenv
 MCP_TOOL_POLICY=allow-list
 MCP_TOOL_ALLOWLIST=get_*,list_*,search_*,create_ticket
+MCP_TOOL_TRIGGER_TERMS=tasks,issues,tickets
 ```
 
 Only allowed tools are shown to the model. Application authorization is still enforced by the MCP gateway and application API.
+Trigger terms are deployment-specific. When a request contains one, the first model turn must call an available tool. This keeps the core bot application-neutral while allowing reliable grounding for each connected application.
 
 ## Request lifecycle
 
-1. Express validates request size and applies rate limiting.
-2. The service verifies the webhook token, bot mention, room/user allow-lists, and deduplication key.
-3. Rocket.Chat receives HTTP `202` immediately.
-4. A request-scoped MCP SDK client connects with a short-lived actor JWT.
-5. The model runs a bounded tool loop using only policy-approved tools.
-6. The bot posts the final Markdown response into the original thread.
-7. The MCP client is closed; active requests are drained during graceful shutdown.
+1. The bot connects to Rocket.Chat over DDP and subscribes to configured rooms.
+2. Incoming messages are checked for bot authorship, mention, room/user
+   allow-lists, and duplicate message IDs.
+3. A request-scoped MCP SDK client connects with a short-lived actor JWT.
+4. The model runs a bounded tool loop using only policy-approved tools.
+5. The bot posts the final Markdown response into the original thread using REST.
+6. The MCP client is closed; DDP is stopped and active requests are drained
+   during graceful shutdown.
 
 ## Docker
 
@@ -162,7 +200,9 @@ The multi-stage image compiles TypeScript and runs only production dependencies 
 ## Production notes
 
 - Replace the in-memory dedupe repository with Redis or another shared store for multiple replicas.
-- Put the service behind ingress rate limiting in addition to the local limiter.
+- If webhook fallback is enabled, put the service behind ingress rate limiting
+  in addition to the local limiter.
 - Add explicit user confirmation for deletes, payments, permission changes, and bulk operations.
 - Never authorize from chat text; the application must authorize every MCP-backed operation.
-- Keep secrets in a managed secret store and rotate webhook, model, Rocket.Chat, and actor credentials.
+- Keep secrets in a managed secret store and rotate model, Rocket.Chat, actor,
+  and any enabled webhook credentials.

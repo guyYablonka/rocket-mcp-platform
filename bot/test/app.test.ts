@@ -41,4 +41,23 @@ describe("Express application", () => {
       .send("{")
       .expect(400, { error: "invalid request" });
   });
+
+  it("does not expose the webhook route in DDP mode", async () => {
+    const config = testConfig();
+    config.rocketChat.transport = "ddp";
+    config.rocketChat.ddpRoomIds = ["ROOM"];
+    const app = createApp({
+      config,
+      logger: pino({ level: "silent" }),
+      webhookService: {
+        handle: () => ({ accepted: true, status: 202 }),
+      },
+    });
+
+    await request(app).get("/healthz").expect(200, { ok: true });
+    await request(app)
+      .post("/webhooks/rocketchat")
+      .send({ hello: "world" })
+      .expect(404, { error: "not found" });
+  });
 });

@@ -34,6 +34,16 @@ export class WebhookService {
       return { accepted: false, status: 400, reason: "invalid payload" };
     }
 
+    if (
+      this.config.rocketChat.webhookToken
+      && !sameSecret(event.token, this.config.rocketChat.webhookToken)
+    ) {
+      return { accepted: false, status: 401, reason: "invalid token" };
+    }
+    return this.handleEvent(event);
+  }
+
+  handleEvent(event: RocketChatEvent): WebhookResult {
     const rejection = this.rejectionReason(event);
     if (rejection) return rejection;
 
@@ -55,11 +65,9 @@ export class WebhookService {
   }
 
   private rejectionReason(event: RocketChatEvent): WebhookResult | undefined {
-    if (!sameSecret(event.token, this.config.rocketChat.webhookToken)) {
-      return { accepted: false, status: 401, reason: "invalid token" };
-    }
     if (
       event.bot
+      || event.userId === this.config.rocketChat.userId
       || event.username.toLowerCase() === this.config.rocketChat.botUsername.toLowerCase()
     ) {
       return { accepted: false, status: 200, reason: "bot message" };

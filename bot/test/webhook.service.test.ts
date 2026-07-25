@@ -86,4 +86,34 @@ describe("WebhookService", () => {
     });
     expect(add).not.toHaveBeenCalled();
   });
+
+  it("skips token validation when no webhook token is configured", async () => {
+    const config = testConfig();
+    config.rocketChat.webhookToken = "";
+    const add = vi.fn(() => true);
+    const logger = pino({ level: "silent" });
+    const service = new WebhookService(
+      config,
+      { add },
+      async () => ({
+        async listTools() { return []; },
+        async callTool() { return {}; },
+        async close() {},
+      }),
+      new AgentService({
+        async complete() {
+          return { role: "assistant", content: "Completed." };
+        },
+      }, config, logger),
+      { async postMessage() {} },
+      logger,
+    );
+
+    expect(service.handle(webhookPayload({ token: "" }))).toEqual({
+      accepted: true,
+      status: 202,
+    });
+    await service.drain();
+    expect(add).toHaveBeenCalledOnce();
+  });
 });

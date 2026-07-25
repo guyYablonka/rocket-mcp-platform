@@ -34,5 +34,6 @@ describe("webhook parsing", () => {
     expect(stripMention("please @helper: create a ticket", "helper"))
       .toBe("please create a ticket");
     expect(containsMention("@someone-else hello", "helper")).toBe(false);
+    expect(containsMention("helper create a ticket", "helper")).toBe(false);
   });
 });

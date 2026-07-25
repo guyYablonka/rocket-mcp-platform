@@ -15,7 +15,11 @@ describe("McpSdkClient", () => {
   });
 
   it("initializes a Streamable HTTP session, lists tools, and calls one", async () => {
-    const seen: Array<{ method: string; session?: string }> = [];
+    const seen: Array<{
+      method: string;
+      session?: string;
+      protocolVersion?: string;
+    }> = [];
     const server = createServer(async (request, response) => {
       if (request.method === "DELETE") {
         response.writeHead(200).end();
@@ -35,6 +39,9 @@ describe("McpSdkClient", () => {
         method: body.method,
         ...(request.headers["mcp-session-id"]
           ? { session: String(request.headers["mcp-session-id"]) }
+          : {}),
+        ...(request.headers["mcp-protocol-version"]
+          ? { protocolVersion: String(request.headers["mcp-protocol-version"]) }
           : {}),
       });
       if (body.method === "notifications/initialized") {
@@ -88,6 +95,9 @@ describe("McpSdkClient", () => {
         "tools/call",
       ]);
       expect(seen[1]?.session).toBe("session-1");
+      expect(seen.slice(1).map((item) => item.protocolVersion))
+        .toEqual(["2025-11-25", "2025-11-25", "2025-11-25"]);
+      expect(seen.every((item) => !item.protocolVersion?.includes(","))).toBe(true);
     } finally {
       await client.close();
     }

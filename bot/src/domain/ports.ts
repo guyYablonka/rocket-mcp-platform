@@ -1,4 +1,11 @@
-import type { McpTool, ModelCompletion, ModelMessage, ModelTool, RocketChatEvent } from "./types.js";
+import type {
+  McpTool,
+  ModelCompletion,
+  ModelMessage,
+  ModelTool,
+  ModelToolChoice,
+  RocketChatEvent,
+} from "./types.js";
 
 export interface McpClient {
   listTools(): Promise<McpTool[]>;
@@ -9,7 +16,11 @@ export interface McpClient {
 export type McpClientFactory = (event: RocketChatEvent) => Promise<McpClient>;
 
 export interface ModelClient {
-  complete(messages: ModelMessage[], tools?: ModelTool[]): Promise<ModelCompletion>;
+  complete(
+    messages: ModelMessage[],
+    tools?: ModelTool[],
+    toolChoice?: ModelToolChoice,
+  ): Promise<ModelCompletion>;
 }
 
 export interface RocketChatClient {

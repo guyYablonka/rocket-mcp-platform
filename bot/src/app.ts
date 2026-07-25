@@ -35,9 +35,11 @@ export function createApp(input: {
     type: "application/json",
   }));
 
-  const webhookController = new WebhookController(input.webhookService);
   app.use(createHealthRouter());
-  app.use(createWebhookRouter(input.config.http, webhookController));
+  if (input.config.rocketChat.transport === "webhook") {
+    const webhookController = new WebhookController(input.webhookService);
+    app.use(createWebhookRouter(input.config.http, webhookController));
+  }
   app.use(notFoundHandler);
   app.use(createErrorHandler(input.logger));
   return app;
