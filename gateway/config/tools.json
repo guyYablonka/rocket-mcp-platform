@@ -1,0 +1,55 @@
+[
+  {
+    "name": "list_tickets",
+    "description": "List support tickets visible to the linked application user.",
+    "requiredScopes": ["tickets:read"],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["open", "closed"] }
+      },
+      "additionalProperties": false
+    },
+    "http": {
+      "method": "GET",
+      "path": "/api/tickets",
+      "queryParams": ["status"]
+    }
+  },
+  {
+    "name": "create_ticket",
+    "description": "Create a support ticket for the linked application user.",
+    "requiredScopes": ["tickets:create"],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "normal", "high"] }
+      },
+      "required": ["title"],
+      "additionalProperties": false
+    },
+    "http": {
+      "method": "POST",
+      "path": "/api/tickets",
+      "bodyParams": ["title", "description", "priority"]
+    }
+  },
+  {
+    "name": "get_ticket",
+    "description": "Get one support ticket by its ID.",
+    "requiredScopes": ["tickets:read"],
+    "inputSchema": {
+      "type": "object",
+      "properties": { "ticketId": { "type": "string" } },
+      "required": ["ticketId"],
+      "additionalProperties": false
+    },
+    "http": {
+      "method": "GET",
+      "path": "/api/tickets/{ticketId}",
+      "pathParams": ["ticketId"]
+    }
+  }
+]

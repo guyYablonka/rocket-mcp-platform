@@ -1,0 +1,8 @@
+[
+  {
+    "tenantId": "default",
+    "rocketUserId": "replace-with-rocket-user-id",
+    "applicationUserId": "replace-with-application-user-id",
+    "scopes": ["tickets:read", "tickets:create"]
+  }
+]

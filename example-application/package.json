@@ -1,0 +1,36 @@
+{
+  "name": "rocket-mcp-example-application",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/frameworks.test.mjs",
+    "start": "npm run start:express",
+    "start:express": "node dist/express/mock-server.js",
+    "start:fastify": "node dist/fastify/mock-server.js",
+    "start:nest": "node dist/nest/mock-server.js",
+    "dev:express": "tsx express/mock-server.ts",
+    "dev:fastify": "tsx fastify/mock-server.ts",
+    "dev:nest": "tsx nest/mock-server.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "@rocket-mcp/token-exchange": "file:../mcp-token-exchange-package",
+    "express": "^5.1.0",
+    "fastify": "^5.6.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

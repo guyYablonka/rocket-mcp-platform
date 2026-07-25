@@ -1,0 +1,64 @@
+{
+  "name": "@rocket-mcp/token-exchange",
+  "version": "0.1.0",
+  "description": "Framework-neutral delegated token-exchange endpoint for MCP gateways, with Express, Fastify, and Nest adapters",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "files": ["dist", "README.md", "LICENSE"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./jwt": {
+      "types": "./dist/jwt.d.ts",
+      "import": "./dist/jwt.js"
+    },
+    "./express": {
+      "types": "./dist/express.d.ts",
+      "import": "./dist/express.js"
+    },
+    "./fastify": {
+      "types": "./dist/fastify.d.ts",
+      "import": "./dist/fastify.js"
+    },
+    "./nest": {
+      "types": "./dist/nest.d.ts",
+      "import": "./dist/nest.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run tests",
+    "prepare": "npm run build",
+    "pack:check": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "zod": "^3.0.0"
+  },
+  "peerDependencies": {
+    "@nestjs/common": ">=10 <13",
+    "express": ">=4.18 <6",
+    "fastify": ">=4 <6",
+    "reflect-metadata": ">=0.1"
+  },
+  "peerDependenciesMeta": {
+    "@nestjs/common": { "optional": true },
+    "express": { "optional": true },
+    "fastify": { "optional": true },
+    "reflect-metadata": { "optional": true }
+  },
+  "devDependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "express": "^5.0.0",
+    "fastify": "^5.0.0",
+    "reflect-metadata": "^0.2.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  },
+  "keywords": ["mcp", "oauth", "token-exchange", "express", "fastify", "nestjs", "typescript"]
+}

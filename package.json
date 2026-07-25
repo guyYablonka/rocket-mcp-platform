@@ -1,0 +1,12 @@
+{
+  "name": "rocket-mcp-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "check": "npm --prefix bot run check && npm --prefix gateway run typecheck && npm --prefix mcp-token-exchange-package run typecheck",
+    "test": "npm --prefix bot test && npm --prefix gateway test && npm --prefix mcp-token-exchange-package test",
+    "build": "npm --prefix bot run build && npm --prefix gateway run build && npm --prefix mcp-token-exchange-package run build"
+  }
+}
